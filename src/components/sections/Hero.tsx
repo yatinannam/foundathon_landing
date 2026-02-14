@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { FnButton } from "@/components/ui/fn-button";
 
 const content = {
   caption: "Foundathon 3.0 | Monopoly Edition | 2026",
@@ -38,19 +39,15 @@ const Hero = () => {
             {content.description}
           </p>
           <div className="flex items-center mt-6 gap-4 flex-wrap justify-center">
-            <Link
-              href="#champion"
-              className="px-6 py-3 text-xl font-bold bg-fnred/70 border-b-4 border-fnred rounded-md active:border-0 transition-discrete duration-150 flex items-center gap-2"
-            >
-              {content.primaryButtonText}
-              <ArrowRight />
-            </Link>
-            <Link
-              href="#release"
-              className="px-6 py-3 text-xl font-bold bg-background/90 border-b-4 border-fnblue border rounded-md active:border-0 transition-discrete duration-150"
-            >
-              {content.secondaryButtonText}
-            </Link>
+            <FnButton asChild tone="red" size="lg">
+              <Link href="#champion">
+                {content.primaryButtonText}
+                <ArrowRight />
+              </Link>
+            </FnButton>
+            <FnButton asChild tone="gray" size="lg" className="border-fnblue">
+              <Link href="#release">{content.secondaryButtonText}</Link>
+            </FnButton>
           </div>
         </div>
       </div>

@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-const PROBLEM_STATEMENT_RELEASE_DATE = new Date("2026-02-26T04:30:00.000Z");
-const PROBLEM_STATEMENT_RELEASE_TS = PROBLEM_STATEMENT_RELEASE_DATE.getTime();
+import { PROBLEM_STATEMENT_RELEASE_DATE } from "@/data/problem-statement-release";
+import { getProblemReleaseCountdown } from "@/lib/problem-release-countdown";
 
 const problemHighlights = [
   {
@@ -23,52 +22,12 @@ const problemHighlights = [
   },
 ];
 
-const getCountdown = (now: number) => {
-  if (!Number.isFinite(PROBLEM_STATEMENT_RELEASE_TS)) {
-    return {
-      days: "00",
-      hours: "00",
-      minutes: "00",
-      seconds: "00",
-      released: false,
-      invalid: true,
-    };
-  }
-
-  const diff = PROBLEM_STATEMENT_RELEASE_TS - now;
-
-  if (diff <= 0) {
-    return {
-      days: "00",
-      hours: "00",
-      minutes: "00",
-      seconds: "00",
-      released: true,
-      invalid: false,
-    };
-  }
-
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-  const minutes = Math.floor((diff / (1000 * 60)) % 60);
-  const seconds = Math.floor((diff / 1000) % 60);
-
-  return {
-    days: String(days).padStart(2, "0"),
-    hours: String(hours).padStart(2, "0"),
-    minutes: String(minutes).padStart(2, "0"),
-    seconds: String(seconds).padStart(2, "0"),
-    released: false,
-    invalid: false,
-  };
-};
-
 const About = () => {
   const releaseDate = useMemo(() => PROBLEM_STATEMENT_RELEASE_DATE, []);
-  const [timeLeft, setTimeLeft] = useState(() => getCountdown(Date.now()));
+  const [timeLeft, setTimeLeft] = useState(() => getProblemReleaseCountdown());
 
   useEffect(() => {
-    const tick = () => setTimeLeft(getCountdown(Date.now()));
+    const tick = () => setTimeLeft(getProblemReleaseCountdown());
     const intervalId = window.setInterval(tick, 1000);
     return () => clearInterval(intervalId);
   }, []);
