@@ -12,6 +12,7 @@ import {
   type TeamRecord,
   teamSubmissionSchema,
 } from "@/lib/register-schema";
+import { create } from "node:domain";
 import { Plus, PlusIcon, Trash2 } from "lucide-react";
 
 type TeamType = "srm" | "non_srm";
@@ -246,8 +247,18 @@ const Register = () => {
         });
         return;
       }
+      // Transform team records to summaries
+      const teamSummaries = (data.teams ?? []).map(team => ({
+        id: team.id,
+        teamName: team.teamName,
+        teamType: team.teamType,
+        leadName: team.lead.name,
+        memberCount: team.members.length,
+        createdAt: team.createdAt,
+        updatedAt: team.updatedAt,
+      }));
 
-      setTeams(data.teams || []);
+      setTeams(teamSummaries);
       router.push(`/register/success/${data.team.id}`);
     } catch {
       toast({
