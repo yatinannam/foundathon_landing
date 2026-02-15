@@ -5,13 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FnButton } from "@/components/ui/fn-button";
 import { toast } from "@/hooks/use-toast";
-import {
-  type NonSrmMember,
-  nonSrmMemberSchema,
-  type SrmMember,
-  srmMemberSchema,
-  teamSubmissionSchema,
-} from "@/lib/register-schema";
+import { type NonSrmMember, nonSrmMemberSchema, type SrmMember, srmMemberSchema, type TeamRecord, teamSubmissionSchema } from "@/lib/register-schema";
+import { create } from "node:domain";
+import { Plus, PlusIcon, Trash2 } from "lucide-react";
 
 type TeamType = "srm" | "non_srm";
 
@@ -265,8 +261,18 @@ const Register = () => {
         });
         return;
       }
+      // Transform team records to summaries
+      const teamSummaries = (data.teams ?? []).map((team) => ({
+        id: team.id,
+        teamName: team.teamName,
+        teamType: team.teamType,
+        leadName: team.lead.name,
+        memberCount: team.members.length,
+        createdAt: team.createdAt,
+        updatedAt: team.updatedAt,
+      }));
 
-      setTeams(data.teams ?? []);
+      setTeams(teamSummaries);
       router.push(`/register/success/${data.team.id}`);
     } catch {
       toast({
@@ -359,19 +365,7 @@ const Register = () => {
                 Team Type
               </p>
               <label className="block">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-foreground/70 font-semibold mb-2">
-                  Select Team Category
-                </p>
-                {/* <select
-                  value={teamType}
-                  onChange={(event) =>
-                    setTeamType(event.target.value as TeamType)
-                  }
-                  className="w-full rounded-lg border border-fnblue/35 bg-linear-to-r from-white to-fnblue/10 px-3 py-2 text-sm font-bold uppercase tracking-[0.08em] text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-fnblue/50"
-                >
-                  <option value="srm">SRM</option>
-                  <option value="non_srm">Non-SRM</option>
-                </select> */}
+                <p className="text-[11px] uppercase tracking-[0.2em] text-foreground/70 font-semibold mb-2">Select Team Category</p>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -400,14 +394,8 @@ const Register = () => {
             </div>
 
             <div className="mt-6 rounded-xl border border-foreground/10 bg-linear-to-b from-gray-100 to-gray-50 p-4 md:p-5 shadow-sm">
-              <p className="text-sm md:text-base font-bold uppercase tracking-[0.08em] mb-3 text-fnblue">
-                Team Identity
-              </p>
-              <Input
-                label="Team Name"
-                value={teamName}
-                onChange={setTeamName}
-              />
+              <p className="text-sm md:text-base font-bold uppercase tracking-[0.08em] mb-3 text-fnblue">Team Identity</p>
+              <Input label="Team Name" value={teamName} onChange={setTeamName} />
             </div>
 
             {teamType === "non_srm" && (
@@ -500,11 +488,7 @@ const Register = () => {
               <FnButton type="button" onClick={clearCurrentTeam} tone="gray">
                 Clear
               </FnButton>
-              <FnButton
-                type="button"
-                onClick={submitTeam}
-                disabled={!canSubmit || isSubmitting}
-              >
+              <FnButton type="button" onClick={submitTeam} disabled={!canSubmit || isSubmitting} className="cursor-pointer">
                 {isSubmitting ? "Saving..." : "Create Team"}
               </FnButton>
             </div>
@@ -616,6 +600,8 @@ const Register = () => {
                             onClick={() => removeMember(index)}
                             tone="red"
                             size="xs"
+                            title="Remove Member"
+                            className="cursor-pointer"
                           >
                             <Trash2 size={16} strokeWidth={3} />
                           </FnButton>
@@ -692,16 +678,8 @@ const MemberDraftCard = ({
 }) => (
   <div className="mt-6 rounded-xl border border-foreground/10 bg-linear-to-b from-gray-100 to-gray-50 p-4 md:p-5 shadow-sm">
     <div className="flex items-center justify-between gap-3 mb-3 h-13">
-      <p className="text-base font-bold uppercase tracking-[0.08em]">
-        Add Member Individually
-      </p>
-      <FnButton
-        type="button"
-        onClick={onAdd}
-        disabled={!canAddMember}
-        tone="green"
-        size="sm"
-      >
+      <p className="text-base font-bold uppercase tracking-[0.08em]">Add Member Individually</p>
+      <FnButton type="button" onClick={onAdd} disabled={!canAddMember} tone="green" size="sm" className="cursor-pointer">
         <PlusIcon size={16} strokeWidth={3} />
         Add Member
       </FnButton>
@@ -717,16 +695,26 @@ type InputProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  type?: string;
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
 };
 
-const Input = ({ label, value, onChange }: InputProps) => (
+const Input = ({ label, value, onChange, type = "text", required = false, minLength, maxLength, pattern }: InputProps) => (
   <label className="block">
     <p className="text-xs uppercase tracking-[0.2em] text-foreground/70 font-semibold mb-1">
       {label}
     </p>
     <input
+      type={type}
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      required={required}
+      minLength={minLength}
+      maxLength={maxLength}
+      pattern={pattern}
       className="w-full rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-fnblue/50"
     />
   </label>
@@ -803,26 +791,10 @@ const NonSrmMemberEditor = ({
       {title}
     </p>
     <div className="grid gap-3 md:grid-cols-2">
-      <Input
-        label="Name"
-        value={member.name}
-        onChange={(v) => onChange("name", v)}
-      />
-      <Input
-        label="College ID Number"
-        value={member.collegeId}
-        onChange={(v) => onChange("collegeId", v)}
-      />
-      <Input
-        label="College Email"
-        value={member.collegeEmail}
-        onChange={(v) => onChange("collegeEmail", v)}
-      />
-      <NumberInput
-        label="Contact"
-        value={member.contact}
-        onChange={(v) => onChange("contact", v)}
-      />
+      <Input label="Name" value={member.name} onChange={(v) => onChange("name", v)} required minLength={2} maxLength={100} />
+      <Input label="College ID Number" value={member.collegeId} onChange={(v) => onChange("collegeId", v)} required minLength={3} maxLength={50} />
+      <Input label="College Email" value={member.collegeEmail} onChange={(v) => onChange("collegeEmail", v)} type="email" required />
+      <NumberInput label="Contact" value={member.contact} onChange={(v) => onChange("contact", v)} />
     </div>
   </div>
 );
@@ -841,12 +813,15 @@ const NumberInput = ({ label, value, onChange }: NumberInputProps) => (
     <input
       type="tel"
       inputMode="numeric"
-      pattern="[0-9]*"
+      pattern="[0-9]{10,15}"
       value={value === 0 ? "" : value}
       onChange={(event) => {
         const digits = event.target.value.replace(/\D/g, "");
         onChange(digits ? Number(digits) : 0);
       }}
+      required
+      minLength={10}
+      maxLength={15}
       className="w-full rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-fnblue/50"
     />
   </label>

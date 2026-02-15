@@ -11,11 +11,7 @@ const contactNumberSchema = z
   });
 
 export const srmMemberSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Name is required.")
-    .max(50, "Name is too long."),
+  name: z.string().trim().min(2, "Name is required.").max(50, "Name is too long."),
   raNumber: z
     .string()
     .trim()
@@ -36,11 +32,7 @@ export const srmMemberSchema = z.object({
 });
 
 export const nonSrmMemberSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Name is required.")
-    .max(50, "Name is too long."),
+  name: z.string().trim().min(2, "Name is required.").max(50, "Name is too long."),
   collegeId: z.string().trim().min(2, "College ID Number is required."),
   collegeEmail: z.email("Valid college email is required."),
   contact: contactNumberSchema,
@@ -57,10 +49,7 @@ export const srmTeamSubmissionSchema = z
       .max(4, "Maximum 4 members are allowed besides the lead."),
   })
   .superRefine((data, ctx) => {
-    const ids = [
-      data.lead.netId,
-      ...data.members.map((member) => member.netId),
-    ];
+    const ids = [data.lead.netId, ...data.members.map((member) => member.netId)];
     if (new Set(ids).size !== ids.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -92,10 +81,7 @@ export const nonSrmTeamSubmissionSchema = z
       });
     }
 
-    const ids = [
-      data.lead.collegeId,
-      ...data.members.map((member) => member.collegeId),
-    ];
+    const ids = [data.lead.collegeId, ...data.members.map((member) => member.collegeId)];
     if (new Set(ids).size !== ids.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -105,10 +91,7 @@ export const nonSrmTeamSubmissionSchema = z
     }
   });
 
-export const teamSubmissionSchema = z.discriminatedUnion("teamType", [
-  srmTeamSubmissionSchema,
-  nonSrmTeamSubmissionSchema,
-]);
+export const teamSubmissionSchema = z.discriminatedUnion("teamType", [srmTeamSubmissionSchema, nonSrmTeamSubmissionSchema]);
 
 export const teamRecordSchema = teamSubmissionSchema.and(
   z.object({
