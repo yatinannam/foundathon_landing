@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FnButton } from "@/components/ui/fn-button";
 import { toast } from "@/hooks/use-toast";
+import { dispatchTeamCreatedEvent } from "@/lib/team-ui-events";
 import { type NonSrmMember, nonSrmMemberSchema, type SrmMember, srmMemberSchema, teamSubmissionSchema } from "@/lib/register-schema";
 
 type TeamType = "srm" | "non_srm";
@@ -180,7 +181,7 @@ const Register = () => {
     toast({
       title: "Member Added to Draft",
       description:
-        "Member is added locally. Click Create Team to submit the final registration.",
+        "Member is added successfully.",
       variant: "success",
     });
   };
@@ -279,6 +280,7 @@ const Register = () => {
       }));
 
       setTeams(teamSummaries);
+      dispatchTeamCreatedEvent(data.team.id);
       router.push(`/register/success/${data.team.id}`);
     } catch {
       toast({

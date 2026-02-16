@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FnButton } from "@/components/ui/fn-button";
+import { isTeamCreatedEventDetail, TEAM_CREATED_EVENT } from "@/lib/team-ui-events";
 import { LineShadowText } from "@/components/ui/line-shadow-text";
 import SignInRequiredModal from "@/components/ui/sign-in-required-modal";
 import { ConfettiButton } from "../ui/confetti-button";
@@ -30,9 +31,9 @@ const HeaderClient = ({
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
+  const [teamId, setTeamId] = useState<string | null>(initialTeamId);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const isSignedIn = initialIsSignedIn;
-  const teamId = initialTeamId;
   const isRegistered = Boolean(teamId);
   const signInHref = useMemo(
     () => `/api/auth/login?next=${encodeURIComponent(pathname)}`,
@@ -52,6 +53,24 @@ const HeaderClient = ({
     setIsAccountMenuOpen(false);
     window.location.assign("/api/auth/logout");
   }, [isLoggingOut]);
+
+  useEffect(() => {
+    setTeamId(initialTeamId);
+  }, [initialTeamId]);
+
+  useEffect(() => {
+    const handleTeamCreated = (event: Event) => {
+      const customEvent = event as CustomEvent<unknown>;
+      if (!isTeamCreatedEventDetail(customEvent.detail)) {
+        return;
+      }
+
+      setTeamId(customEvent.detail.teamId);
+    };
+
+    window.addEventListener(TEAM_CREATED_EVENT, handleTeamCreated);
+    return () => window.removeEventListener(TEAM_CREATED_EVENT, handleTeamCreated);
+  }, []);
 
   useEffect(() => {
     if (!isAccountMenuOpen) {
