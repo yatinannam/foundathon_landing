@@ -621,7 +621,7 @@ const Register = () => {
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-background/95 p-6 shadow-md border-b-4 border-fnred backdrop-blur-sm">
+            {/* <div className="rounded-2xl border bg-background/95 p-6 shadow-md border-b-4 border-fnred backdrop-blur-sm">
               <p className="text-xs uppercase tracking-[0.22em] text-foreground/70 font-semibold">
                 Saved Teams (JSON)
               </p>
@@ -655,7 +655,7 @@ const Register = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
           </aside>
         </div>
       </div>
