@@ -237,7 +237,7 @@ export default function TeamDashboardPage() {
     toast({
       title: "Member Draft Updated",
       description:
-        "Member changes are valid. Remember to save changes!.",
+        "Member changes are valid. Remember to save changes!",
       variant: "success",
     });
     cancelEditMember();
