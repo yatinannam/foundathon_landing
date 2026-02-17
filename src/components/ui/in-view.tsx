@@ -34,7 +34,7 @@ export function InView({
   as = "div",
   once,
 }: InViewProps) {
-  const ref = useRef(null);
+  const ref = useRef<Element>(null);
   const isInView = useInView(ref, viewOptions);
 
   const [isViewed, setIsViewed] = useState(false);
