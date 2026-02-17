@@ -21,20 +21,20 @@ const geistMono = Work_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://foundthon.thefoundersclub.tech"),
+  metadataBase: new URL("https://foundathon.thefoundersclub.tech"),
   title: "Foundathon 3.0 - The Founders Club",
   description:
     "Foundathon 3.0 is a three-day innovation marathon featuring a dual-stage competitive structure. Participants tackle specific challenges curated by industry partners, with track winners earning direct recognition from the respective organization. These track champions then advance to a grand finale to compete for the ultimate cash prize.",
   openGraph: {
     type: "website",
-    url: "https://foundthon.thefoundersclub.tech",
+    url: "https://foundathon.thefoundersclub.tech",
     title: "Foundathon 3.0",
     description:
       "Foundathon 3.0 is a three-day innovation marathon featuring a dual-stage competitive structure. Participants tackle specific challenges curated by industry partners, with track winners earning direct recognition from the respective organization. These track champions then advance to a grand finale to compete for the ultimate cash prize.",
     siteName: "Foundathon 3.0",
     images: [
       {
-        url: "https://foundthon.thefoundersclub.tech/opengraph-image.png",
+        url: "/opengraph-image.png",
         width: 1200,
         height: 630,
         alt: "Foundathon 3.0",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     title: "Foundathon 3.0 - The Founders Club",
     description:
       "Foundathon 3.0 is a three-day innovation marathon featuring a dual-stage competitive structure.",
-    images: ["https://foundthon.thefoundersclub.tech/opengraph-image.png"],
+    images: ["/opengraph-image.png"],
   },
   icons: {
     icon: [{ url: "/favicon.svg" }],
