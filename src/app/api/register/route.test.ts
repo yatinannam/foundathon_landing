@@ -306,6 +306,58 @@ describe("/api/register route", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("POST returns 409 when more than 10 teams already joined a statement", async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const existingSelect = vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({ maybeSingle }),
+      }),
+    });
+
+    const overCapRows = Array.from({ length: 11 }).map(() => ({
+      details: { problemStatementId: "ps-01" },
+    }));
+    const countEq = vi
+      .fn()
+      .mockResolvedValue({ data: overCapRows, error: null });
+    const countSelect = vi.fn().mockReturnValue({ eq: countEq });
+
+    const insert = vi.fn();
+    const from = vi
+      .fn()
+      .mockReturnValueOnce({ select: existingSelect })
+      .mockReturnValueOnce({ select: countSelect })
+      .mockReturnValueOnce({ insert });
+
+    mocks.createSupabaseClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { email: "lead@example.com", id: "user-1" } },
+          error: null,
+        }),
+      },
+      from,
+    });
+
+    const { POST } = await import("./route");
+    const req = new NextRequest("http://localhost/api/register", {
+      body: JSON.stringify({
+        lockToken: "token-1",
+        problemStatementId: "ps-01",
+        team: teamPayload,
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.error).toContain("cap");
+    expect(insert).not.toHaveBeenCalled();
+  });
+
   it("DELETE rejects invalid id format", async () => {
     const { DELETE } = await import("./route");
     const req = new NextRequest("http://localhost/api/register?id=not-a-uuid", {

@@ -486,7 +486,7 @@ const RegisterClient = () => {
 
       toast({
         title: "Problem Statement Locked",
-        description: `${data.problemStatement.title} has been locked for your team draft.`,
+        description: `${data.problemStatement.title} has been locked. Email confirmation will be handled by backend later.`,
         variant: "success",
       });
     } catch {
