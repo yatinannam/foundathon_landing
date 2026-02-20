@@ -1,39 +1,41 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { PROBLEM_STATEMENT_RELEASE_DATE } from "@/data/problem-statement-release";
-import { getProblemReleaseCountdown } from "@/lib/problem-release-countdown";
 import { InView } from "../ui/in-view";
-import { SlidingNumber } from "../ui/sliding-number";
 
 const problemHighlights = [
   {
-    title: "Partner Territories (Problem Claims)",
+    title: "Partner Territories (Problem Tracks)",
     detail:
-      "High-impact problem statements are curated by partner companies. Think of each one as a premium property tile that teams can claim early.",
+      "High-impact problem statements are curated by partner companies. Each statement represents a focused track with real execution constraints.",
   },
   {
-    title: "First-Come, First-Serve Draft",
+    title: "Lock Before Team Creation",
     detail:
-      "Selection is strictly first-come, first-serve for each statement. Once a problem tile is full, teams must choose another open tile.",
+      "Teams first complete onboarding, then lock one statement. Team registration is finalized only after the lock and create action.",
   },
   {
-    title: "PPT Submission Cap Rule",
+    title: "Per-Statement Team Cap",
     detail:
-      "When a certain number of teams for a statement submits PPTs, that statement is disabled and no additional team can opt for it.",
+      "Each problem statement has a fixed team cap. Once filled, that statement is marked unavailable for new teams.",
+  },
+];
+
+const onboardingSequence = [
+  {
+    step: "1. Build Team Draft",
+    detail: "Fill in team details and validate members before proceeding.",
+  },
+  {
+    step: "2. Lock One Statement",
+    detail: "Choose a problem statement with available slots and lock it.",
+  },
+  {
+    step: "3. Create Team",
+    detail: "Finalize team creation and continue directly to the dashboard.",
   },
 ];
 
 const About = () => {
-  const releaseDate = useMemo(() => PROBLEM_STATEMENT_RELEASE_DATE, []);
-  const [timeLeft, setTimeLeft] = useState(() => getProblemReleaseCountdown());
-
-  useEffect(() => {
-    const tick = () => setTimeLeft(getProblemReleaseCountdown());
-    const intervalId = window.setInterval(tick, 1000);
-    return () => clearInterval(intervalId);
-  }, []);
-
   return (
     <section
       className="bg-background text-foreground font-mono relative scroll-auto"
@@ -42,7 +44,7 @@ const About = () => {
       <div className="fncontainer relative py-20 md:py-24 space-y-16">
         <div className="space-y-5 text-center max-w-4xl mx-auto">
           <p className="rounded-full inline-flex px-3 uppercase font-bold tracking-wide bg-fngreen/20 text-fngreen border-2 border-fngreen">
-            Fastest Fingers First
+            Structured Onboarding
           </p>
           <h2 className="text-5xl md:text-6xl font-bold tracking-tighter uppercase text-balance">
             claim your block,
@@ -63,16 +65,14 @@ const About = () => {
             <InView
               key={item.title}
               variants={{
-                hidden: { opacity: 0, y: 100, filter: 'blur(4px)' },
-                visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
+                hidden: { opacity: 0, y: 100, filter: "blur(4px)" },
+                visible: { opacity: 1, y: 0, filter: "blur(0px)" },
               }}
-              viewOptions={{ margin: '0px 0px -200px 0px' }}
-              transition={{ duration: 0.3 + (key / 10) , ease: 'easeInOut' }}
+              viewOptions={{ margin: "0px 0px -200px 0px" }}
+              transition={{ duration: 0.3 + key / 10, ease: "easeInOut" }}
               once
             >
-              <div
-                className="rounded-xl h-full bg-gray-100 border-b-4 border-fnblue border px-6 py-7 shadow-sm"
-              >
+              <div className="rounded-xl h-full bg-gray-100 border-b-4 border-fnblue border px-6 py-7 shadow-sm">
                 <p className="text-xs uppercase tracking-[0.25em] text-fnblue font-bold">
                   Board Rule
                 </p>
@@ -87,62 +87,31 @@ const About = () => {
           ))}
         </div>
 
-        <div
-          id="release"
-          className="rounded-2xl border border-b-4 border-fngreen bg-background/90 p-8 space-y-6 shadow-sm scroll-mt-28"
-        >
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-[0.3em] text-fngreen font-bold">
-                Problem Statement Release
-              </p>
-              <h3 className="text-3xl md:text-4xl font-bold tracking-tight uppercase">
-                countdown clock
-              </h3>
-            </div>
-            <div className="text-sm font-semibold text-foreground/70 uppercase tracking-wide">
-              claim opens when timer hits zero
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: "Days", value: timeLeft.days },
-              { label: "Hours", value: timeLeft.hours },
-              { label: "Minutes", value: timeLeft.minutes },
-              { label: "Seconds", value: timeLeft.seconds },
-            ].map((unit) => (
+        <div className="rounded-2xl border border-b-4 border-fngreen bg-background/90 p-8 shadow-sm">
+          <p className="text-sm uppercase tracking-[0.3em] text-fngreen font-bold">
+            Onboarding Flow
+          </p>
+          <h3 className="mt-2 text-3xl md:text-4xl font-bold tracking-tight uppercase">
+            lock. create. dashboard.
+          </h3>
+          <p className="mt-3 text-sm md:text-base text-foreground/75 max-w-3xl">
+            The registration flow is now direct and deterministic. Complete
+            onboarding, lock a statement, and launch into team operations.
+          </p>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {onboardingSequence.map((item) => (
               <div
-                key={unit.label}
-                className="rounded-xl border bg-linear-to-b from-white to-gray-100 p-5 border-b-4 border-fnblue text-center shadow-sm"
+                key={item.step}
+                className="rounded-xl border border-b-4 border-fnblue bg-gray-100 px-5 py-5 shadow-sm"
               >
-                <div className="text-4xl md:text-5xl font-black tracking-tight text-fnblue flex justify-center" suppressHydrationWarning>
-                  <SlidingNumber value={parseInt(unit.value, 10)} padStart={true} />
-                </div>
-                <p className="text-xs uppercase tracking-[0.25em] text-foreground/70 mt-2">
-                  {unit.label}
+                <p className="text-xs uppercase tracking-[0.2em] text-fnblue font-bold">
+                  {item.step}
+                </p>
+                <p className="mt-3 text-sm text-foreground/80 leading-relaxed">
+                  {item.detail}
                 </p>
               </div>
             ))}
-          </div>
-
-          <div className="rounded-lg border border-foreground/10 bg-gray-100 px-5 py-4 space-y-2">
-            <p className="text-sm uppercase tracking-[0.2em] text-foreground/70">
-              Release Time
-            </p>
-            <p className="text-lg md:text-xl font-bold" suppressHydrationWarning>
-              {releaseDate.toLocaleString("en-IN", { timeZoneName: "short" })}
-            </p>
-            <p className="text-sm text-foreground/70" suppressHydrationWarning>
-              UTC: {releaseDate.toUTCString()}
-            </p>
-            <p className="text-sm text-foreground/70" aria-live="polite">
-              {timeLeft.invalid
-                ? "Release date configuration is invalid. Please update the constant value."
-                : timeLeft.released
-                  ? "Problem statements are now live."
-                  : "The first-come, first-serve draft begins as soon as this countdown ends."}
-            </p>
           </div>
         </div>
 

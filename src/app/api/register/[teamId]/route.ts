@@ -1,4 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  getProblemStatementById,
+  PROBLEM_STATEMENT_CAP,
+} from "@/data/problem-statements";
+import { verifyProblemLockToken } from "@/lib/problem-lock-token";
+import {
+  countProblemStatementRegistrations,
+  getProblemStatementIdFromDetails,
+  type ProblemStatementCountRow,
+} from "@/lib/problem-statement-availability";
 import {
   createSupabaseClient,
   EVENT_ID,
@@ -24,11 +35,26 @@ const parseRequestJson = async (request: NextRequest): Promise<unknown> => {
   }
 };
 
+const statementLockPatchSchema = z.object({
+  lockToken: z.string().trim().min(1, "Lock token is required."),
+  problemStatementId: z
+    .string()
+    .trim()
+    .min(1, "Problem statement is required."),
+});
+
 const missingSupabaseConfigResponse = () =>
   NextResponse.json(
     { error: "Supabase environment variables are not configured." },
     { status: 500, headers: JSON_HEADERS },
   );
+
+const PROBLEM_STATEMENT_DETAIL_KEYS = [
+  "problemStatementId",
+  "problemStatementTitle",
+  "problemStatementCap",
+  "problemStatementLockedAt",
+] as const;
 
 const findTeamById = async ({
   supabase,
@@ -80,7 +106,7 @@ export async function GET(_: NextRequest, { params }: Params) {
 
   if (error) {
     return NextResponse.json(
-      { error: "Failed to fetch team." },
+      { error: error.message || "Failed to fetch team." },
       { status: 500, headers: JSON_HEADERS },
     );
   }
@@ -91,7 +117,7 @@ export async function GET(_: NextRequest, { params }: Params) {
       { status: 404, headers: JSON_HEADERS },
     );
   }
-  console.log("Fetched team data:", data);
+
   const team = toTeamRecord(data as RegistrationRow);
   if (!team) {
     return NextResponse.json(
@@ -135,6 +161,25 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     );
   }
 
+  const bodyObject =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : null;
+  const hasLockFieldInPayload = Boolean(
+    bodyObject &&
+      ("lockToken" in bodyObject || "problemStatementId" in bodyObject),
+  );
+
+  const lockPayloadParsed = statementLockPatchSchema.safeParse(body);
+  if (hasLockFieldInPayload && !lockPayloadParsed.success) {
+    return NextResponse.json(
+      {
+        error:
+          lockPayloadParsed.error.issues[0]?.message ??
+          "Both lock token and problem statement id are required.",
+      },
+      { status: 400, headers: JSON_HEADERS },
+    );
+  }
+
   const credentials = getSupabaseCredentials();
   if (!credentials) return missingSupabaseConfigResponse();
 
@@ -151,9 +196,120 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     );
   }
 
+  const { data: existingTeam, error: existingTeamError } = await findTeamById({
+    supabase,
+    teamId,
+    userId: user.id,
+  });
+
+  if (existingTeamError) {
+    return NextResponse.json(
+      { error: existingTeamError.message || "Failed to fetch team." },
+      { status: 500, headers: JSON_HEADERS },
+    );
+  }
+
+  if (!existingTeam) {
+    return NextResponse.json(
+      { error: "Team not found." },
+      { status: 404, headers: JSON_HEADERS },
+    );
+  }
+
+  const existingDetails =
+    existingTeam.details && typeof existingTeam.details === "object"
+      ? (existingTeam.details as Record<string, unknown>)
+      : {};
+  const existingStatementId = getProblemStatementIdFromDetails(existingDetails);
+  const updatedDetails: Record<string, unknown> = withSrmEmailNetIds(
+    parsed.data,
+  );
+
+  for (const key of PROBLEM_STATEMENT_DETAIL_KEYS) {
+    const value = existingDetails[key];
+
+    if (typeof value === "string" && value.trim().length > 0) {
+      updatedDetails[key] = value;
+      continue;
+    }
+
+    if (
+      key === "problemStatementCap" &&
+      typeof value === "number" &&
+      Number.isInteger(value) &&
+      value > 0
+    ) {
+      updatedDetails[key] = value;
+    }
+  }
+
+  if (lockPayloadParsed.success) {
+    if (existingStatementId) {
+      return NextResponse.json(
+        { error: "A problem statement is already locked for this team." },
+        { status: 409, headers: JSON_HEADERS },
+      );
+    }
+
+    const problemStatement = getProblemStatementById(
+      lockPayloadParsed.data.problemStatementId,
+    );
+
+    if (!problemStatement) {
+      return NextResponse.json(
+        { error: "Problem statement not found." },
+        { status: 400, headers: JSON_HEADERS },
+      );
+    }
+
+    const lockVerification = verifyProblemLockToken({
+      problemStatementId: problemStatement.id,
+      token: lockPayloadParsed.data.lockToken,
+      userId: user.id,
+    });
+
+    if (!lockVerification.valid) {
+      return NextResponse.json(
+        { error: lockVerification.error },
+        { status: 400, headers: JSON_HEADERS },
+      );
+    }
+
+    const { data: statementRows, error: statementRowsError } = await supabase
+      .from("eventsregistrations")
+      .select("details")
+      .eq("event_id", EVENT_ID);
+
+    if (statementRowsError) {
+      return NextResponse.json(
+        { error: "Failed to check statement availability." },
+        { status: 500, headers: JSON_HEADERS },
+      );
+    }
+
+    const registeredCount = countProblemStatementRegistrations(
+      (statementRows ?? []) as ProblemStatementCountRow[],
+      problemStatement.id,
+    );
+
+    if (registeredCount >= PROBLEM_STATEMENT_CAP) {
+      return NextResponse.json(
+        { error: "This problem statement is currently unavailable." },
+        { status: 409, headers: JSON_HEADERS },
+      );
+    }
+
+    updatedDetails.problemStatementId = problemStatement.id;
+    updatedDetails.problemStatementTitle = problemStatement.title;
+    updatedDetails.problemStatementCap = PROBLEM_STATEMENT_CAP;
+    updatedDetails.problemStatementLockedAt = new Date(
+      lockVerification.payload.iat,
+    ).toISOString();
+  }
+
   const { data, error } = await supabase
     .from("eventsregistrations")
-    .update({ details: withSrmEmailNetIds(parsed.data) })
+    .update({ details: updatedDetails })
     .eq("id", teamId)
     .eq("event_id", EVENT_ID)
     .eq("application_id", user.id)
@@ -162,7 +318,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   if (error) {
     return NextResponse.json(
-      { error: "Failed to update team." },
+      { error: error.message || "Failed to update team." },
       { status: 500, headers: JSON_HEADERS },
     );
   }

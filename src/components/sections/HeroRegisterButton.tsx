@@ -36,11 +36,11 @@ const HeroRegisterButton = ({
           range={200}
         >
           <FnButton asChild tone="red" size="lg">
-            <Link href={`/team/${initialTeamId}`} prefetch={true}>
+            <Link href={`/dashboard/${initialTeamId}`} prefetch={true}>
               <Magnetic
                 intensity={0.05}
                 springOptions={springOptions}
-                actionArea='global'
+                actionArea="global"
                 range={200}
               >
                 <span className="text-nowrap flex gap-2 items-center">
