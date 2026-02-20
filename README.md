@@ -1,6 +1,6 @@
 # TODO (Team Tracker)
 
-- [ ] Move hardcoded production URL in `src/app/api/auth/login/route.ts` to env (`APP_URL` or `NEXT_PUBLIC_SITE_URL`) so auth callback host is deploy-safe.
+- Auth callback host in `src/app/api/auth/login/route.ts` **must** be driven by env (`APP_URL` or `NEXT_PUBLIC_SITE_URL`) instead of a hardcoded production URL so deployments remain callback-safe across environments.
 - [ ] Route registration create through DB-side atomic function (`create_foundathon_registration_with_cap`) to eliminate race windows during high concurrency.
 - [ ] Add/commit explicit SQL for `eventsregistrations` schema, indexes, and RLS policies (currently only function migration is in repo).
 - [ ] Expand `.env.example` to include all runtime keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `SITE_URL`, `PROBLEM_LOCK_TOKEN_SECRET`).
