@@ -152,7 +152,7 @@ bun build
 
 ### Important note about current `.env.example`
 
-Current `/.env.example` in this repo only contains `PROBLEM_LOCK_TOKEN_SECRET`.
+Current `/.env.example` in this repo contains `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `PROBLEM_LOCK_TOKEN_SECRET`.
 
 However, the runtime also requires Supabase keys. If your team uses Doppler/CI secret injection, that is fine, but local dev still needs these keys available in process env.
 
