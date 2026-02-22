@@ -1,39 +1,13 @@
-import { type NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { z } from "zod";
-import {
-  getProblemStatementById,
-  PROBLEM_STATEMENT_CAP,
-} from "@/data/problem-statements";
-import { verifyProblemLockToken } from "@/lib/problem-lock-token";
-import {
-  countProblemStatementRegistrations,
-  getProblemStatementIdFromDetails,
-  type ProblemStatementCountRow,
-} from "@/lib/problem-statement-availability";
-import {
-  createSupabaseClient,
-  EVENT_ID,
-  getSupabaseCredentials,
-  JSON_HEADERS,
-  type RegistrationRow,
-  toTeamRecord,
-  UUID_PATTERN,
-  withSrmEmailNetIds,
-} from "@/lib/register-api";
+import { UUID_PATTERN } from "@/lib/register-api";
 import { teamSubmissionSchema } from "@/lib/register-schema";
+import { getRouteAuthContext } from "@/server/auth/context";
+import { isJsonRequest, parseJsonSafely } from "@/server/http/request";
+import { jsonError, jsonNoStore } from "@/server/http/response";
+import { deleteTeam, getTeam, patchTeam } from "@/server/registration/service";
 
 type Params = { params: Promise<{ teamId: string }> };
-
-const isJsonRequest = (request: NextRequest) =>
-  request.headers.get("content-type")?.includes("application/json");
-
-const parseRequestJson = async (request: NextRequest): Promise<unknown> => {
-  try {
-    return await request.json();
-  } catch {
-    return null;
-  }
-};
 
 const statementLockPatchSchema = z.object({
   lockToken: z.string().trim().min(1, "Lock token is required."),
@@ -43,121 +17,50 @@ const statementLockPatchSchema = z.object({
     .min(1, "Problem statement is required."),
 });
 
-const missingSupabaseConfigResponse = () =>
-  NextResponse.json(
-    { error: "Supabase environment variables are not configured." },
-    { status: 500, headers: JSON_HEADERS },
-  );
-
-const PROBLEM_STATEMENT_DETAIL_KEYS = [
-  "problemStatementId",
-  "problemStatementTitle",
-  "problemStatementCap",
-  "problemStatementLockedAt",
-] as const;
-
-const findTeamById = async ({
-  supabase,
-  teamId,
-  userId,
-}: {
-  supabase: Awaited<ReturnType<typeof createSupabaseClient>>;
-  teamId: string;
-  userId: string;
-}) =>
-  supabase
-    .from("eventsregistrations")
-    .select("id, created_at, details")
-    .eq("id", teamId)
-    .eq("event_id", EVENT_ID)
-    .eq("application_id", userId)
-    .maybeSingle();
-
 export async function GET(_: NextRequest, { params }: Params) {
   const { teamId } = await params;
   if (!UUID_PATTERN.test(teamId)) {
-    return NextResponse.json(
-      { error: "Team id is invalid." },
-      { status: 400, headers: JSON_HEADERS },
-    );
+    return jsonError("Team id is invalid.", 400);
   }
 
-  const credentials = getSupabaseCredentials();
-  if (!credentials) return missingSupabaseConfigResponse();
-
-  const supabase = await createSupabaseClient(credentials);
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401, headers: JSON_HEADERS },
-    );
+  const context = await getRouteAuthContext();
+  if (!context.ok) {
+    return context.response;
   }
 
-  const { data, error } = await findTeamById({
-    supabase,
+  const result = await getTeam({
+    supabase: context.supabase,
     teamId,
-    userId: user.id,
+    userId: context.user.id,
   });
 
-  if (error) {
-    return NextResponse.json(
-      { error: error.message || "Failed to fetch team." },
-      { status: 500, headers: JSON_HEADERS },
-    );
+  if (!result.ok) {
+    return jsonError(result.error, result.status);
   }
 
-  if (!data) {
-    return NextResponse.json(
-      { error: "Team not found." },
-      { status: 404, headers: JSON_HEADERS },
-    );
-  }
-
-  const team = toTeamRecord(data as RegistrationRow);
-  if (!team) {
-    return NextResponse.json(
-      { error: "Team data is incomplete or outdated." },
-      { status: 422, headers: JSON_HEADERS },
-    );
-  }
-
-  return NextResponse.json({ team }, { headers: JSON_HEADERS });
+  return jsonNoStore(result.data, result.status);
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const { teamId } = await params;
   if (!UUID_PATTERN.test(teamId)) {
-    return NextResponse.json(
-      { error: "Team id is invalid." },
-      { status: 400, headers: JSON_HEADERS },
-    );
+    return jsonError("Team id is invalid.", 400);
   }
 
   if (!isJsonRequest(request)) {
-    return NextResponse.json(
-      { error: "Content-Type must be application/json." },
-      { status: 415, headers: JSON_HEADERS },
-    );
+    return jsonError("Content-Type must be application/json.", 415);
   }
 
-  const body = await parseRequestJson(request);
+  const body = await parseJsonSafely(request);
   if (body === null) {
-    return NextResponse.json(
-      { error: "Invalid JSON payload." },
-      { status: 400, headers: JSON_HEADERS },
-    );
+    return jsonError("Invalid JSON payload.", 400);
   }
 
   const parsed = teamSubmissionSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Invalid payload." },
-      { status: 400, headers: JSON_HEADERS },
+    return jsonError(
+      parsed.error.issues[0]?.message ?? "Invalid payload.",
+      400,
     );
   }
 
@@ -170,224 +73,55 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const lockPayloadParsed = statementLockPatchSchema.safeParse(body);
   if (hasLockFieldInPayload && !lockPayloadParsed.success) {
-    return NextResponse.json(
-      {
-        error:
-          lockPayloadParsed.error.issues[0]?.message ??
-          "Both lock token and problem statement id are required.",
-      },
-      { status: 400, headers: JSON_HEADERS },
+    return jsonError(
+      lockPayloadParsed.error.issues[0]?.message ??
+        "Both lock token and problem statement id are required.",
+      400,
     );
   }
 
-  const credentials = getSupabaseCredentials();
-  if (!credentials) return missingSupabaseConfigResponse();
-
-  const supabase = await createSupabaseClient(credentials);
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401, headers: JSON_HEADERS },
-    );
+  const context = await getRouteAuthContext();
+  if (!context.ok) {
+    return context.response;
   }
 
-  const { data: existingTeam, error: existingTeamError } = await findTeamById({
-    supabase,
+  const result = await patchTeam({
+    input: {
+      ...(lockPayloadParsed.success ? { lock: lockPayloadParsed.data } : {}),
+      team: parsed.data,
+    },
+    supabase: context.supabase,
     teamId,
-    userId: user.id,
+    userId: context.user.id,
   });
 
-  if (existingTeamError) {
-    return NextResponse.json(
-      { error: existingTeamError.message || "Failed to fetch team." },
-      { status: 500, headers: JSON_HEADERS },
-    );
+  if (!result.ok) {
+    return jsonError(result.error, result.status);
   }
 
-  if (!existingTeam) {
-    return NextResponse.json(
-      { error: "Team not found." },
-      { status: 404, headers: JSON_HEADERS },
-    );
-  }
-
-  const existingDetails =
-    existingTeam.details && typeof existingTeam.details === "object"
-      ? (existingTeam.details as Record<string, unknown>)
-      : {};
-  const existingStatementId = getProblemStatementIdFromDetails(existingDetails);
-  const updatedDetails: Record<string, unknown> = withSrmEmailNetIds(
-    parsed.data,
-  );
-
-  for (const key of PROBLEM_STATEMENT_DETAIL_KEYS) {
-    const value = existingDetails[key];
-
-    if (typeof value === "string" && value.trim().length > 0) {
-      updatedDetails[key] = value;
-      continue;
-    }
-
-    if (
-      key === "problemStatementCap" &&
-      typeof value === "number" &&
-      Number.isInteger(value) &&
-      value > 0
-    ) {
-      updatedDetails[key] = value;
-    }
-  }
-
-  if (lockPayloadParsed.success) {
-    if (existingStatementId) {
-      return NextResponse.json(
-        { error: "A problem statement is already locked for this team." },
-        { status: 409, headers: JSON_HEADERS },
-      );
-    }
-
-    const problemStatement = getProblemStatementById(
-      lockPayloadParsed.data.problemStatementId,
-    );
-
-    if (!problemStatement) {
-      return NextResponse.json(
-        { error: "Problem statement not found." },
-        { status: 400, headers: JSON_HEADERS },
-      );
-    }
-
-    const lockVerification = verifyProblemLockToken({
-      problemStatementId: problemStatement.id,
-      token: lockPayloadParsed.data.lockToken,
-      userId: user.id,
-    });
-
-    if (!lockVerification.valid) {
-      return NextResponse.json(
-        { error: lockVerification.error },
-        { status: 400, headers: JSON_HEADERS },
-      );
-    }
-
-    const { data: statementRows, error: statementRowsError } = await supabase
-      .from("eventsregistrations")
-      .select("details")
-      .eq("event_id", EVENT_ID);
-
-    if (statementRowsError) {
-      return NextResponse.json(
-        { error: "Failed to check statement availability." },
-        { status: 500, headers: JSON_HEADERS },
-      );
-    }
-
-    const registeredCount = countProblemStatementRegistrations(
-      (statementRows ?? []) as ProblemStatementCountRow[],
-      problemStatement.id,
-    );
-
-    if (registeredCount >= PROBLEM_STATEMENT_CAP) {
-      return NextResponse.json(
-        { error: "This problem statement is currently unavailable." },
-        { status: 409, headers: JSON_HEADERS },
-      );
-    }
-
-    updatedDetails.problemStatementId = problemStatement.id;
-    updatedDetails.problemStatementTitle = problemStatement.title;
-    updatedDetails.problemStatementCap = PROBLEM_STATEMENT_CAP;
-    updatedDetails.problemStatementLockedAt = new Date(
-      lockVerification.payload.iat,
-    ).toISOString();
-  }
-
-  const { data, error } = await supabase
-    .from("eventsregistrations")
-    .update({ details: updatedDetails })
-    .eq("id", teamId)
-    .eq("event_id", EVENT_ID)
-    .eq("application_id", user.id)
-    .select("id, created_at, details")
-    .maybeSingle();
-
-  if (error) {
-    return NextResponse.json(
-      { error: error.message || "Failed to update team." },
-      { status: 500, headers: JSON_HEADERS },
-    );
-  }
-
-  if (!data) {
-    return NextResponse.json(
-      { error: "Team not found." },
-      { status: 404, headers: JSON_HEADERS },
-    );
-  }
-
-  const team = toTeamRecord(data as RegistrationRow);
-  if (!team) {
-    return NextResponse.json(
-      { error: "Team data is incomplete or outdated." },
-      { status: 422, headers: JSON_HEADERS },
-    );
-  }
-
-  return NextResponse.json({ team }, { headers: JSON_HEADERS });
+  return jsonNoStore(result.data, result.status);
 }
 
 export async function DELETE(_: NextRequest, { params }: Params) {
   const { teamId } = await params;
   if (!UUID_PATTERN.test(teamId)) {
-    return NextResponse.json(
-      { error: "Team id is invalid." },
-      { status: 400, headers: JSON_HEADERS },
-    );
+    return jsonError("Team id is invalid.", 400);
   }
 
-  const credentials = getSupabaseCredentials();
-  if (!credentials) return missingSupabaseConfigResponse();
-
-  const supabase = await createSupabaseClient(credentials);
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401, headers: JSON_HEADERS },
-    );
+  const context = await getRouteAuthContext();
+  if (!context.ok) {
+    return context.response;
   }
 
-  const { data: deleted, error } = await supabase
-    .from("eventsregistrations")
-    .delete()
-    .eq("id", teamId)
-    .eq("event_id", EVENT_ID)
-    .eq("application_id", user.id)
-    .select("id")
-    .maybeSingle();
+  const result = await deleteTeam({
+    supabase: context.supabase,
+    teamId,
+    userId: context.user.id,
+  });
 
-  if (error) {
-    return NextResponse.json(
-      { error: "Failed to remove team." },
-      { status: 500, headers: JSON_HEADERS },
-    );
+  if (!result.ok) {
+    return jsonError(result.error, result.status);
   }
 
-  if (!deleted) {
-    return NextResponse.json(
-      { error: "Team not found." },
-      { status: 404, headers: JSON_HEADERS },
-    );
-  }
-
-  return NextResponse.json({ deleted: true }, { headers: JSON_HEADERS });
+  return jsonNoStore(result.data, result.status);
 }

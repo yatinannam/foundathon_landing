@@ -23,9 +23,11 @@ const geistMono = Work_Sans({
 export const metadata: Metadata = {
   metadataBase: new URL("https://foundathon.thefoundersclub.tech"),
   title: "Foundathon 3.0 - The Founders Club",
-  description: "Foundathon 3.0 is a three-day innovation marathon featuring a dual-stage competitive structure. Participants tackle specific challenges curated by industry partners, with track winners earning direct recognition from the respective organization. These track champions then advance to a grand finale to compete for the ultimate cash prize.",
+  description:
+    "Foundathon 3.0 is a three-day innovation marathon featuring a dual-stage competitive structure. Participants tackle specific challenges curated by industry partners, with track winners earning direct recognition from the respective organization. These track champions then advance to a grand finale to compete for the ultimate cash prize.",
   publisher: "Founders Club",
-  classification: "Business / Entrepreneurship / Innovation / Hackathon / Startup Event",
+  classification:
+    "Business / Entrepreneurship / Innovation / Hackathon / Startup Event",
   keywords: [
     "Foundathon 3.0",
     "Foundathon",
@@ -76,7 +78,7 @@ export const metadata: Metadata = {
       "Foundathon 3.0 is a three-day innovation marathon featuring a dual-stage competitive structure.",
     images: ["/opengraph-image.png"],
   },
-  
+
   icons: {
     icon: [{ url: "/favicon.svg" }],
   },

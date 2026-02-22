@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getProblemLockTokenSecret } from "@/server/env";
 
 export const PROBLEM_LOCK_TOKEN_TTL_MS = 30 * 60 * 1000;
 
@@ -32,7 +33,7 @@ type VerifyProblemLockTokenResult =
   | { error: string; valid: false };
 
 const getSecret = (providedSecret?: string) => {
-  const secret = providedSecret ?? process.env.PROBLEM_LOCK_TOKEN_SECRET;
+  const secret = providedSecret ?? getProblemLockTokenSecret();
   if (!secret) {
     throw new Error("PROBLEM_LOCK_TOKEN_SECRET is not configured.");
   }

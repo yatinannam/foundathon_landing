@@ -1,11 +1,8 @@
 # TODO (Team Tracker)
 
-- Auth callback host in `src/app/api/auth/login/route.ts` **must** be driven by env (`APP_URL` or `NEXT_PUBLIC_SITE_URL`) instead of a hardcoded production URL so deployments remain callback-safe across environments.
 - [ ] Route registration create through DB-side atomic function (`create_foundathon_registration_with_cap`) to eliminate race windows during high concurrency.
 - [ ] Add/commit explicit SQL for `eventsregistrations` schema, indexes, and RLS policies (currently only function migration is in repo).
-- [ ] Expand `.env.example` to include all runtime keys (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`, `SITE_URL`, `PROBLEM_LOCK_TOKEN_SECRET`).
-- [ ] Add CI pipeline (`bun test`, `bun lint`, `bun build`) for PR gating.
-- [ ] Decide whether `src/app/(auth)/auth/callback/route.ts` is still required or should be removed to avoid duplicate callback maintenance.
+- [ ] Add CI pipeline (`bun run test`, `bun run lint`, `bun run build`) for PR gating.
 
 # Foundathon Landing + Registration App
 
@@ -83,7 +80,7 @@ Browser UI
 
 - App Router (`src/app/*`) with server and client components mixed by need.
 - Zod schema validation on both client flow and server route boundaries.
-- Statement lock token is signed server-side with HMAC (`PROBLEM_LOCK_TOKEN_SECRET`).
+- Statement lock token is signed server-side with HMAC (`FOUNDATHON_PROBLEM_LOCK_TOKEN_SECRET`).
 - Current cap enforcement is done in application logic before insert/update.
 
 ## 2) Tech stack
@@ -143,18 +140,18 @@ doppler run -- bun dev
 ### Run tests and checks
 
 ```bash
-bun test
-bun lint
-bun build
+bun run test
+bun run lint
+bun run build
 ```
 
 ## 4) Environment variables
 
 ### Important note about current `.env.example`
 
-Current `/.env.example` in this repo contains `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `PROBLEM_LOCK_TOKEN_SECRET`.
+Current `/.env.example` in this repo includes all runtime keys used by API/auth/email routes.
 
-However, the runtime also requires Supabase keys. If your team uses Doppler/CI secret injection, that is fine, but local dev still needs these keys available in process env.
+If your team uses Doppler/CI secret injection, that is fine, but local dev still needs these keys available in process env.
 
 ### Full env matrix
 
@@ -162,23 +159,23 @@ However, the runtime also requires Supabase keys. If your team uses Doppler/CI s
 | --- | --- | --- | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Yes | Public + Server | `src/lib/register-api.ts`, `src/utils/supabase/*`, auth routes | Base Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Yes | Public + Server | `src/lib/register-api.ts`, `src/utils/supabase/*`, auth routes | Supabase anon key |
-| `PROBLEM_LOCK_TOKEN_SECRET` | Yes (for lock flow) | Yes | Server only | `src/lib/problem-lock-token.ts` | HMAC signing secret |
-| `NEXT_PUBLIC_SITE_URL` | Optional | Recommended | Public + Server | `src/app/sitemap.ts`, `src/app/robots.ts` | Preferred canonical host |
-| `SITE_URL` | Optional | Recommended | Server | `src/app/sitemap.ts`, `src/app/robots.ts` | Fallback canonical host |
-| `NODE_ENV` | No | No (host sets it) | Runtime | auth callback logic | Expect `production` in deploy |
-| `RESEND_API_KEY` | Optional | Optional | Server | none currently | Present in local env, unused in code |
+| `FOUNDATHON_PROBLEM_LOCK_TOKEN_SECRET` | Yes (for lock flow) | Yes | Server only | `src/lib/problem-lock-token.ts` | HMAC signing secret |
+| `FOUNDATHON_NEXT_PUBLIC_SITE_URL` | Optional | Recommended | Public + Server | `src/app/sitemap.ts`, `src/app/robots.ts`, auth + send routes | Canonical host + callback base |
+| `FOUNDATHON_NODE_ENV` | Optional | Optional | Runtime | auth login/callback | Set to `development` locally |
+| `FOUNDATHON_RESEND_API_KEY` | Optional | Optional | Server | `src/app/api/send/route.ts` | Enables lock notification emails |
 
 ### Recommended `.env.local` template
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
-PROBLEM_LOCK_TOKEN_SECRET=<openssl-random>
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-SITE_URL=http://localhost:3000
+FOUNDATHON_NEXT_PUBLIC_SITE_URL=http://localhost:3000
+FOUNDATHON_RESEND_API_KEY=<resend-key>
+FOUNDATHON_PROBLEM_LOCK_TOKEN_SECRET=<openssl-random>
+FOUNDATHON_NODE_ENV=development
 ```
 
-### Generate `PROBLEM_LOCK_TOKEN_SECRET`
+### Generate `FOUNDATHON_PROBLEM_LOCK_TOKEN_SECRET`
 
 ```bash
 openssl rand -base64 48
@@ -247,18 +244,18 @@ If backend has event FK constraints, this event id must exist.
 From `package.json`:
 
 - `bun dev` -> Next dev server
-- `bun build` -> production build
+- `bun run build` -> production build
 - `bun start` -> run built app
-- `bun lint` -> Biome checks
+- `bun run lint` -> Biome checks
 - `bun format` -> format write
-- `bun test` -> Vitest run
-- `bun test:watch` -> Vitest watch mode
+- `bun run test` -> Vitest run
+- `bun run test:watch` -> Vitest watch mode
 
 ## 7) Project structure (annotated)
 
 ```text
 .
-├─ .env.example                         # minimal env template currently in repo
+├─ .env.example                         # runtime env template
 ├─ biome.json                           # lint + formatter config
 ├─ components.json                      # shadcn settings and aliases
 ├─ next.config.ts                       # security headers, reactCompiler
@@ -290,7 +287,7 @@ From `package.json`:
    │  ├─ auth/
    │  │  └─ auth-code-error/page.tsx    # OAuth error page
    │  ├─ (auth)/
-   │  │  └─ auth/callback/route.ts      # alternative callback route
+   │  │  └─ auth/callback/route.ts      # compatibility redirect to /api/auth/callback
    │  ├─ api/
    │  │  ├─ auth/
    │  │  │  ├─ login/route.ts
@@ -822,7 +819,7 @@ App currently does not call this RPC. Routing create through this function is re
 ### Run tests
 
 ```bash
-bun test
+bun run test
 ```
 
 ### What is covered
@@ -862,7 +859,7 @@ bun test
 
 ### Change canonical URL for sitemap/robots
 
-- Set `NEXT_PUBLIC_SITE_URL` and/or `SITE_URL`
+- Set `FOUNDATHON_NEXT_PUBLIC_SITE_URL`
 - Files:
   - `src/app/sitemap.ts`
   - `src/app/robots.ts`
@@ -879,9 +876,9 @@ bun test
 - [ ] Deploy target sets Node runtime compatible with Next 16
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` configured
 - [ ] `NEXT_PUBLIC_SUPABASE_ANON_KEY` configured
-- [ ] `PROBLEM_LOCK_TOKEN_SECRET` configured
-- [ ] `NEXT_PUBLIC_SITE_URL` configured
-- [ ] `SITE_URL` configured
+- [ ] `FOUNDATHON_PROBLEM_LOCK_TOKEN_SECRET` configured
+- [ ] `FOUNDATHON_NEXT_PUBLIC_SITE_URL` configured
+- [ ] `FOUNDATHON_RESEND_API_KEY` configured (if email notifications should send)
 
 ### Supabase
 
@@ -892,9 +889,9 @@ bun test
 
 ### Quality gates
 
-- [ ] `bun test` passes
-- [ ] `bun lint` passes
-- [ ] `bun build` passes
+- [ ] `bun run test` passes
+- [ ] `bun run lint` passes
+- [ ] `bun run build` passes
 
 ## 20) Troubleshooting
 
@@ -907,7 +904,7 @@ Check:
 
 ### Error: "PROBLEM_LOCK_TOKEN_SECRET is not configured"
 
-Set `PROBLEM_LOCK_TOKEN_SECRET` in environment for runtime where API routes execute.
+Set `FOUNDATHON_PROBLEM_LOCK_TOKEN_SECRET` in environment for runtime where API routes execute.
 
 ### OAuth callback is failing
 
@@ -936,9 +933,7 @@ Inspect rows for current event id where:
 ## 21) Known limitations
 
 - Cap enforcement is app-level read/check/write and can race under concurrency.
-- `src/app/api/auth/login/route.ts` contains a hardcoded production URL.
-- `.env.example` is currently not exhaustive.
-- Duplicate callback route exists (`/api/auth/callback` and `/(auth)/auth/callback`).
+- Database-level atomic insert function is not yet wired into registration route handlers.
 
 ---
 
