@@ -82,7 +82,8 @@ describe("/api/send POST", () => {
 
   it("uses NEXT_PUBLIC_SITE_URL when SITE_URL is missing", async () => {
     process.env.SITE_URL = "";
-    process.env.FOUNDATHON_NEXT_PUBLIC_SITE_URL = "https://public-foundathon.example";
+    process.env.FOUNDATHON_NEXT_PUBLIC_SITE_URL =
+      "https://public-foundathon.example";
     mocks.resendSend.mockResolvedValue({
       data: { id: "email-2" },
       error: null,
